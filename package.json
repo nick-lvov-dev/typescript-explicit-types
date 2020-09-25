@@ -23,7 +23,22 @@
         "command": "extension.generateExplicitType",
         "title": "Generate explicit type"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "TypeScript Explicit Types",
+      "properties": {
+        "typescriptExplicitTypes.preferable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Mark type generation actions as preferable."
+        },
+        "typescriptExplicitTypes.enableImportAction": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show action that automatically import the generated type if it's missing"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
