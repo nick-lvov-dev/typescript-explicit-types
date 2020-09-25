@@ -48,17 +48,11 @@ export class GenereateTypeProvider implements CodeActionProvider {
   };
 
   public async provideCodeActions(document: TextDocument, range: Range | Selection, context: CodeActionContext): Promise<CodeAction[]> {
-    // don't shot action if there are errors
-    if (context.diagnostics.length) return [];
-
     const rangeText = document.getText(range);
     if (rangeText.includes(':')) return [];
 
     const wordRange = document.getWordRangeAtPosition(range.start, /(\w|\(|\))+/);
     if (!wordRange) return [];
-
-    const documentDiagnostics = languages.getDiagnostics(document.uri);
-    if (documentDiagnostics.some((x) => x.range.contains(wordRange))) return [];
 
     // make sure we're looking at a definition
     const definitions = await executeDefinitionProvider(document.uri, range.start);
