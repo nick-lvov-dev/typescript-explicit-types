@@ -17,13 +17,7 @@ import {
   workspace,
 } from 'vscode';
 import { commandHandler } from './command';
-
-const configurationId = 'typescriptExplicitTypes';
-
-enum ConfigurationKey {
-  preferable = 'preferable',
-  enableImportAction = 'enableImportAction',
-}
+import { configurationId, ConfigurationKey } from './configuraiton';
 
 interface Hover {
   range: Range;
@@ -84,7 +78,7 @@ export class GenereateTypeProvider implements CodeActionProvider {
     if (!tsHoverContent) return [];
 
     const action = new CodeAction('Generate explicit type', CodeActionKind.QuickFix);
-    const args: Parameters<typeof commandHandler> = [tsHoverContent, wordRange.end];
+    const args: Parameters<typeof commandHandler> = [tsHoverContent, wordRange.end, word];
     action.command = { command: 'extension.generateExplicitType', title: 'Generate explicit type', arguments: args };
     action.isPreferred = isPreferrable;
 
