@@ -1,8 +1,9 @@
 {
   "name": "typescript-explicit-types",
-  "displayName": "typescript-explicit-types",
+  "displayName": "TypeScript Explicit Types",
   "description": "Generate explicit type annotation from inferred type in TypeScript",
   "version": "0.0.1",
+  "icon": "logo.png",
   "publisher": "nick-lvov-dev",
   "repository": "https://github.com/nick-lvov-dev/typescript-explicit-types",
   "engines": {
@@ -17,13 +18,13 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-		"commands": [
-			{
-				"command": "extension.generateExplicitType",
-				"title": "Generate explicit type"
-			}
-		]
-	},
+    "commands": [
+      {
+        "command": "extension.generateExplicitType",
+        "title": "Generate explicit type"
+      }
+    ]
+  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
