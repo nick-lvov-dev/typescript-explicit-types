@@ -47,21 +47,15 @@ export class GenereateTypeProvider implements CodeActionProvider {
     providedCodeActionKinds: [CodeActionKind.QuickFix],
   };
 
-  public async provideCodeActions(
-    document: TextDocument,
-    range: Range | Selection,
-    context: CodeActionContext,
-    token: CancellationToken
-  ): Promise<CodeAction[]> {
+  public async provideCodeActions(document: TextDocument, range: Range | Selection, context: CodeActionContext): Promise<CodeAction[]> {
     // don't shot action if there are errors
     if (context.diagnostics.length) return [];
 
     const rangeText = document.getText(range);
     if (rangeText.includes(':')) return [];
 
-    const wordRange = document.getWordRangeAtPosition(range.start);
+    const wordRange = document.getWordRangeAtPosition(range.start, /(\w|\(|\))+/);
     if (!wordRange) return [];
-    const word = document.getText(wordRange);
 
     const documentDiagnostics = languages.getDiagnostics(document.uri);
     if (documentDiagnostics.some((x) => x.range.contains(wordRange))) return [];
@@ -85,6 +79,14 @@ export class GenereateTypeProvider implements CodeActionProvider {
     const action = new CodeAction('Generate explicit type', CodeActionKind.QuickFix);
     const args: Parameters<typeof commandHandler> = [tsHoverContent, wordRange.end];
     action.command = { command: 'extension.generateExplicitType', title: 'Generate explicit type', arguments: args };
-    return [action];
+
+    const actionWithAutoImport = new CodeAction('Generate explicit type & import', CodeActionKind.QuickFix);
+    actionWithAutoImport.command = {
+      command: 'extension.generateExplicitType',
+      title: 'Generate explicit type & import',
+      arguments: [...args, true],
+    };
+    actionWithAutoImport.isPreferred = true;
+    return [actionWithAutoImport, action];
   }
 }
