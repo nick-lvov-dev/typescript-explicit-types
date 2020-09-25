@@ -63,13 +63,14 @@ export class GenereateTypeProvider implements CodeActionProvider {
     const rangeText = document.getText(range);
     if (rangeText.includes(':')) return [];
 
-    const wordRange = document.getWordRangeAtPosition(range.start, /(\w|\(|\))+/);
+    const wordRange = document.getWordRangeAtPosition(range.start, /(\w|\(.*\))+/);
     if (!wordRange) return [];
 
     // make sure we're looking at a definition
     const definitions = await executeDefinitionProvider(document.uri, range.start);
     if (!definitions?.some((x) => isDefinitionFocused(document, range, x))) return [];
 
+    const word = document.getText(wordRange);
     const nextSymbolEndPosition = new Position(wordRange.end.line, wordRange.end.character + 1);
     const followingText = document.getText(new Range(wordRange.end, nextSymbolEndPosition));
     if (followingText === ':') return [];

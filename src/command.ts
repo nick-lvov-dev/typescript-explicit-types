@@ -13,7 +13,7 @@ export const commandHandler = async (typescriptHoverResult: string, position: Po
     return;
   }
 
-  const parsedType = typescriptHoverResult.split(':')[1].split('\n')[0];
+  const parsedType = typescriptHoverResult.split(':').slice(-1)[0].split('\n')[0];
   await activeEditor.edit((editor) => editor.insert(position, `:${parsedType}`));
   if (!autoImport) return;
 
