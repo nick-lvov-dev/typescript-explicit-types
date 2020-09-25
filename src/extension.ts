@@ -1,4 +1,4 @@
-import { commands, DocumentFilter, ExtensionContext, languages, window } from 'vscode';
+import { commands, DocumentFilter, ExtensionContext, languages } from 'vscode';
 import { GenereateTypeProvider } from './actionProvider';
 import { commandHandler, commandId } from './command';
 
