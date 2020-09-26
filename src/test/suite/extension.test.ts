@@ -1,7 +1,18 @@
 import * as assert from 'assert';
 import * as path from 'path';
 
-import { CodeAction, commands, DiagnosticSeverity, languages, Range, TextDocument, TextDocumentContentProvider, Uri, window } from 'vscode';
+import {
+  CodeAction,
+  commands,
+  DiagnosticSeverity,
+  languages,
+  Range,
+  Selection,
+  TextDocument,
+  TextDocumentContentProvider,
+  Uri,
+  window,
+} from 'vscode';
 import { commandId } from '../../command';
 import { sleep } from '../../sleep';
 const getPathDirname = (src: string, parentNumber = 1) => {
@@ -140,6 +151,42 @@ suite('Extension Test Suite', async function () {
       const name = 'imp2';
       const textEditor = await window.showTextDocument(getUri(name));
       await performTypeGeneration(name, textEditor.document, { autoImport: true });
+    } catch (e) {
+      assert.fail(e);
+    }
+  });
+
+  test('Simple cursor', async () => {
+    try {
+      const name = 'cursor1';
+      const textEditor = await window.showTextDocument(getUri(name));
+      const initialCursorPosition = new Selection(textEditor.selection.anchor, textEditor.selection.active);
+      await performTypeGeneration(name, textEditor.document);
+      assert.deepStrictEqual(initialCursorPosition, textEditor.selection);
+    } catch (e) {
+      assert.fail(e);
+    }
+  });
+
+  test('Import cursor', async () => {
+    try {
+      const name = 'cursor2';
+      const textEditor = await window.showTextDocument(getUri(name));
+      const initialCursorPosition = new Selection(textEditor.selection.anchor, textEditor.selection.active);
+      await performTypeGeneration(name, textEditor.document, { autoImport: true });
+      assert.deepStrictEqual(initialCursorPosition, textEditor.selection);
+    } catch (e) {
+      assert.fail(e);
+    }
+  });
+
+  test('Complex cursor', async () => {
+    try {
+      const name = 'cursor3';
+      const textEditor = await window.showTextDocument(getUri(name));
+      const initialCursorPosition = new Selection(textEditor.selection.anchor, textEditor.selection.active);
+      await performTypeGeneration(name, textEditor.document);
+      assert.deepStrictEqual(initialCursorPosition, textEditor.selection);
     } catch (e) {
       assert.fail(e);
     }

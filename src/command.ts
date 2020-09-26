@@ -34,7 +34,7 @@ export const commandHandler = async (typescriptHoverResult: string, position: Po
 
   const document = activeEditor.document;
   const text = document.getText();
-  const typeIndex = text.indexOf(cleanType.replace(/\n/gm, '\r\n'));
+  const typeIndex = text.indexOf(cleanType.replace(/\n/gm, '\r\n'), text.indexOf(word));
   if (typeIndex < 0) return;
 
   const typePositionStart = document.positionAt(typeIndex);
@@ -42,8 +42,11 @@ export const commandHandler = async (typescriptHoverResult: string, position: Po
   const typeRange = new Range(typePositionStart, typePositionEnd);
   if (!typeRange) return;
 
+  const initialSelection = new Selection(activeEditor.selection.anchor, activeEditor.selection.active);
   if (isAutoFormatOn) {
-    activeEditor.selection = new Selection(typeRange.start, typeRange.end);
+    if (autoImport) {
+      activeEditor.selection = new Selection(typeRange.start, typeRange.end);
+    }
     const edits = await commands.executeCommand<TextEdit[]>('vscode.executeFormatRangeProvider', document.uri, typeRange);
     if (!edits) return;
     const workspaceEdit = new WorkspaceEdit();
@@ -53,7 +56,7 @@ export const commandHandler = async (typescriptHoverResult: string, position: Po
 
   if (autoImport) {
     const diagnosticsRange = isAutoFormatOn ? new Range(activeEditor.selection.start, activeEditor.selection.end) : typeRange;
-    activeEditor.selection = new Selection(diagnosticsRange.start, diagnosticsRange.start);
+    activeEditor.selection = initialSelection;
     for (let i = 0; i < 30; i++) {
       const diagnostics = languages.getDiagnostics(document.uri);
       if (diagnostics.find((x) => diagnosticsRange.contains(x.range) || x.range.contains(diagnosticsRange))) {
