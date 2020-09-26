@@ -14,7 +14,7 @@ import {
   window,
 } from 'vscode';
 import { commandId } from '../../command';
-import { sleep } from '../../sleep';
+import { sleep } from '../../helpers/sleep';
 const getPathDirname = (src: string, parentNumber = 1) => {
   let res = src;
   for (let i = 0; i < parentNumber; i++) res = path.dirname(res);
@@ -42,7 +42,7 @@ const performTypeGeneration = async (element: string, document: TextDocument, { 
   const actions = await executeCodeActionProvider(document.uri, wordRange);
   const generateAction = actions?.find((action) => {
     const args = action.command?.arguments;
-    return Array.isArray(args) && args.length === (autoImport ? 4 : 3) && action.command!.command === commandId;
+    return Array.isArray(args) && args.length === (autoImport ? 2 : 1) && action.command!.command === commandId;
   });
   if (!generateAction) assert.fail('Generate action not found');
 
@@ -73,6 +73,16 @@ suite('Extension Test Suite', async function () {
     try {
       const textEditor = await window.showTextDocument(getUri('f1'));
       await performTypeGeneration('f1()', textEditor.document, { expectedType: 'void' });
+    } catch (e) {
+      assert.fail(e);
+    }
+  });
+
+  test('Multiline arguments function', async () => {
+    try {
+      const name = 'f2';
+      const textEditor = await window.showTextDocument(getUri(name));
+      await performTypeGeneration(name, textEditor.document);
     } catch (e) {
       assert.fail(e);
     }
@@ -119,6 +129,16 @@ suite('Extension Test Suite', async function () {
   test('Arrow function with complex argument', async () => {
     try {
       const name = 'a3';
+      const textEditor = await window.showTextDocument(getUri(name));
+      await performTypeGeneration(name, textEditor.document);
+    } catch (e) {
+      assert.fail(e);
+    }
+  });
+  
+  test('Arrow function argument', async () => {
+    try {
+      const name = 'a4';
       const textEditor = await window.showTextDocument(getUri(name));
       await performTypeGeneration(name, textEditor.document);
     } catch (e) {

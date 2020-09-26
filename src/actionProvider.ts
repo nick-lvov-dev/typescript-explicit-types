@@ -1,23 +1,25 @@
-import { Duplex } from 'stream';
+import { uniqWith } from 'lodash';
 import {
-  CancellationToken,
   CodeAction,
   CodeActionContext,
   CodeActionKind,
   CodeActionProvider,
   CodeActionProviderMetadata,
   commands,
-  languages,
+  DocumentSymbol,
   MarkdownString,
   Position,
   Range,
   Selection,
+  SymbolKind,
   TextDocument,
   Uri,
   workspace,
 } from 'vscode';
-import { commandHandler } from './command';
+import { commandHandler, GenerateTypeInfo } from './command';
 import { configurationId, ConfigurationKey } from './configuraiton';
+import { findClosingBracketMatchIndex } from './helpers/findClosingBracketMatchIndex';
+import { findMatches } from './helpers/findMatches';
 
 interface Hover {
   range: Range;
@@ -39,8 +41,9 @@ function executeDefinitionProvider(uri: Uri, position: Position) {
   return commands.executeCommand<Location[]>('vscode.executeDefinitionProvider', uri, position);
 }
 
-const isDefinitionFocused = (document: TextDocument, range: Range, location: Location): boolean =>
-  document.uri.path === location.targetUri.path && location.targetSelectionRange.contains(range);
+function executeSymbolProvider(uri: Uri) {
+  return commands.executeCommand<DocumentSymbol[]>('vscode.executeDocumentSymbolProvider', uri);
+}
 
 export class GenereateTypeProvider implements CodeActionProvider {
   public static readonly fixAllCodeActionKind = CodeActionKind.SourceFixAll.append('tslint');
@@ -54,35 +57,110 @@ export class GenereateTypeProvider implements CodeActionProvider {
     const isPreferrable = config.get<boolean>(ConfigurationKey.preferable);
     const isAutoImportActionEnabled = config.get<boolean>(ConfigurationKey.enableImportAction);
 
-    const rangeText = document.getText(range);
-    if (rangeText.includes(':')) return [];
+    const allDefinitions: Location[] = [];
+    for (let lineNumber = range.start.line; lineNumber <= range.end.line; lineNumber++) {
+      const line = document.lineAt(lineNumber);
+      const startCharNumber = lineNumber === range.start.line ? range.start.character : 0;
+      const endCharNumber = lineNumber === range.end.line ? range.end.character : line.range.end.character;
+      for (let charNumber = startCharNumber; charNumber <= endCharNumber; charNumber++) {
+        const foundDefinitions = await executeDefinitionProvider(document.uri, new Position(lineNumber, charNumber));
+        if (foundDefinitions?.length) allDefinitions.push(foundDefinitions[0]);
+      }
+    }
 
-    const wordRange = document.getWordRangeAtPosition(range.start, /(\w|\(.*\))+/);
-    if (!wordRange) return [];
+    if (!allDefinitions.length) return [];
 
-    // make sure we're looking at a definition
-    const definitions = await executeDefinitionProvider(document.uri, range.start);
-    if (!definitions?.some((x) => isDefinitionFocused(document, range, x))) return [];
+    const definitions = uniqWith(allDefinitions, (a, b) => a.originSelectionRange.isEqual(b.originSelectionRange));
+    const symbols = await executeSymbolProvider(document.uri);
 
-    const word = document.getText(wordRange);
-    const nextSymbolEndPosition = new Position(wordRange.end.line, wordRange.end.character + 1);
-    const followingText = document.getText(new Range(wordRange.end, nextSymbolEndPosition));
-    if (followingText === ':') return [];
+    const generateTypeInfos: GenerateTypeInfo[] = [];
+    for (const definition of definitions) {
+      const hoverRes = await executeHoverProvider(document.uri, definition.originSelectionRange.start);
+      if (!hoverRes) continue;
 
-    const res = await executeHoverProvider(document.uri, range.start);
-    if (!res) return [];
+      // check if definition has a typescript annotation
+      const tsHoverContent = hoverRes
+        .reduce<string[]>((acc, val) => acc.concat(val.contents.map((x) => x.value)), [])
+        .find((x) => x.includes('typescript'));
+      if (!tsHoverContent) continue;
 
-    const tsHoverContent = res
-      .reduce<string[]>((acc, val) => acc.concat(val.contents.map((x) => x.value)), [])
-      .find((x) => x.includes('typescript'));
-    if (!tsHoverContent) return [];
+      const word = document.getText(definition.originSelectionRange);
+      const lineText = document.getText(document.lineAt(definition.originSelectionRange.start.line).range);
+
+      // => is recognized as a definition, but it's type is usually defined before, unlike all other types
+      if (word === '=>') {
+        // check that there are arrow functions without type on this line
+        const regexp = /\)\s*=>/gm;
+        const matches = findMatches(regexp, lineText);
+        const indexes = matches.map((x) => x.index);
+        if (!matches.length) continue;
+
+        const passedIndex = indexes.find((i) => i > definition.originSelectionRange.start.character);
+
+        // look for a potential index of a match
+        // there might be several arrow functions on the same line & this definition might actually be one with a type
+        const potentialIndexIndex = passedIndex ? indexes.indexOf(passedIndex) - 1 : indexes.length - 1;
+        if (potentialIndexIndex < 0) continue;
+
+        // check that our match contains the definition
+        const potentialIndex = indexes[potentialIndexIndex];
+        const definitionMatch = matches![potentialIndexIndex];
+        if (
+          potentialIndex >= definition.originSelectionRange.start.character ||
+          potentialIndex + definitionMatch[0].length <= definition.originSelectionRange.start.character
+        )
+          continue;
+
+        generateTypeInfos.push({
+          isFunction: true,
+          typescriptHoverResult: tsHoverContent,
+          typePosition: new Position(definition.originSelectionRange.start.line, potentialIndex + 1),
+        });
+        continue;
+      }
+
+      const symbol = symbols?.find((x) => x.selectionRange.contains(definition.originSelectionRange));
+      if (symbol?.kind === SymbolKind.Function || word === 'function') {
+        // find out suitable type position by looking for a closing bracket of the function
+        const offset = document.offsetAt(definition.originSelectionRange.end);
+        const relevantText = document.getText(new Range(definition.originSelectionRange.end, definition.targetRange.end));
+        const firstBracket = relevantText.indexOf('(');
+        const closingBracketIndex = findClosingBracketMatchIndex(relevantText, firstBracket);
+
+        const isFunctionTyped = relevantText.slice(closingBracketIndex + 1).match(/^\s*:/);
+        if (isFunctionTyped) continue;
+
+        generateTypeInfos.push({
+          typescriptHoverResult: tsHoverContent,
+          typePosition: document.positionAt(offset + closingBracketIndex + 1),
+          isFunction: true,
+        });
+      } else {
+        // check if type annotation is already present
+        let typePosition = new Position(definition.originSelectionRange.end.line, definition.originSelectionRange.end.character);
+        const slice = lineText.slice(typePosition.character);
+        const match = slice.match(/^\s*:/g);
+        if (match?.length) continue;
+
+        // if the definition is followed by brackets it's probably a getter, move type annotation position in that case
+        const matches = findMatches(/^\s*\(\)/g, slice);
+        if (matches.length) typePosition = new Position(typePosition.line, typePosition.character + matches[0][0].length);
+
+        generateTypeInfos.push({
+          typescriptHoverResult: tsHoverContent,
+          typePosition,
+        });
+      }
+    }
+
+    if (!generateTypeInfos.length) return [];
 
     const action = new CodeAction('Generate explicit type', CodeActionKind.QuickFix);
-    const args: Parameters<typeof commandHandler> = [tsHoverContent, wordRange.end, word];
+    const args: Parameters<typeof commandHandler> = [generateTypeInfos];
     action.command = { command: 'extension.generateExplicitType', title: 'Generate explicit type', arguments: args };
     action.isPreferred = isPreferrable;
 
-    if (!isAutoImportActionEnabled) return [action];
+    if (generateTypeInfos.length > 1 || !isAutoImportActionEnabled) return [action];
 
     const actionWithAutoImport = new CodeAction('Generate explicit type & import', CodeActionKind.QuickFix);
     actionWithAutoImport.command = {

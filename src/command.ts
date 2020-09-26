@@ -1,9 +1,33 @@
-import { CodeAction, commands, languages, Position, Range, Selection, TextEdit, Uri, window, workspace, WorkspaceEdit } from 'vscode';
+import {
+  CodeAction,
+  commands,
+  languages,
+  Position,
+  Range,
+  Selection,
+  TextEdit,
+  TextEditor,
+  Uri,
+  window,
+  workspace,
+  WorkspaceEdit,
+} from 'vscode';
 import { configurationId, ConfigurationKey } from './configuraiton';
-import { sleep } from './sleep';
+import { findMatchIndexes } from './helpers/findMatches';
+import { sleep } from './helpers/sleep';
+
+export interface GenerateTypeInfo {
+  typescriptHoverResult: string;
+  typePosition: Position;
+  isFunction?: boolean;
+}
 
 function executeCodeActionProvider(uri: Uri, range: Range) {
   return commands.executeCommand<CodeAction[]>('vscode.executeCodeActionProvider', uri, range);
+}
+
+function executeFormatRangeProvider(uri: Uri, range: Range) {
+  return commands.executeCommand<TextEdit[]>('vscode.executeFormatRangeProvider', uri, range);
 }
 
 const executeActionCommand = async (action: CodeAction) => {
@@ -12,29 +36,22 @@ const executeActionCommand = async (action: CodeAction) => {
   await commands.executeCommand.apply(null, [command.command, ...command.arguments!]);
 };
 
-export const commandId = 'extension.generateExplicitType';
-export const commandHandler = async (typescriptHoverResult: string, position: Position, word: string, autoImport = false) => {
-  const activeEditor = window.activeTextEditor;
-  if (!activeEditor) {
-    return;
-  }
-
-  const config = workspace.getConfiguration(configurationId);
-  const isAutoFormatOn = config.get<boolean>(ConfigurationKey.formatAfterGeneration);
-
-  if (!typescriptHoverResult.includes(word) && !word.includes('(')) return;
-  const splitByWord = typescriptHoverResult.includes(word)
-    ? typescriptHoverResult.split(word)
-    : typescriptHoverResult.split(word.split('(')[0]);
-  const dirtyType = splitByWord.slice(1)[0];
+const generateType = async (
+  { typescriptHoverResult, typePosition, isFunction }: GenerateTypeInfo,
+  editor: TextEditor,
+  autoImport?: boolean,
+  isAutoFormatOn?: boolean
+) => {
+  const indexes = findMatchIndexes(/:/gm, typescriptHoverResult);
+  const dirtyType = typescriptHoverResult.slice(isFunction ? indexes.slice(-1)[0] : indexes[0]);
   const cleanType = dirtyType.replace(/(`)/gm, '').replace(/\n+$/, '');
-  await activeEditor.edit((editor) => editor.insert(position, cleanType));
+  await editor.edit((editor) => editor.insert(typePosition, cleanType));
 
   if (!autoImport && !isAutoFormatOn) return;
 
-  const document = activeEditor.document;
+  const document = editor.document;
   const text = document.getText();
-  const typeIndex = text.indexOf(cleanType.replace(/\n/gm, '\r\n'), text.indexOf(word));
+  const typeIndex = text.indexOf(cleanType.replace(/\n/gm, '\r\n'), document.offsetAt(typePosition));
   if (typeIndex < 0) return;
 
   const typePositionStart = document.positionAt(typeIndex);
@@ -42,12 +59,12 @@ export const commandHandler = async (typescriptHoverResult: string, position: Po
   const typeRange = new Range(typePositionStart, typePositionEnd);
   if (!typeRange) return;
 
-  const initialSelection = new Selection(activeEditor.selection.anchor, activeEditor.selection.active);
+  const initialSelection = new Selection(editor.selection.anchor, editor.selection.active);
   if (isAutoFormatOn) {
     if (autoImport) {
-      activeEditor.selection = new Selection(typeRange.start, typeRange.end);
+      editor.selection = new Selection(typeRange.start, typeRange.end);
     }
-    const edits = await commands.executeCommand<TextEdit[]>('vscode.executeFormatRangeProvider', document.uri, typeRange);
+    const edits = await executeFormatRangeProvider(document.uri, typeRange);
     if (!edits) return;
     const workspaceEdit = new WorkspaceEdit();
     workspaceEdit.set(document.uri, edits);
@@ -55,8 +72,8 @@ export const commandHandler = async (typescriptHoverResult: string, position: Po
   }
 
   if (autoImport) {
-    const diagnosticsRange = isAutoFormatOn ? new Range(activeEditor.selection.start, activeEditor.selection.end) : typeRange;
-    activeEditor.selection = initialSelection;
+    const diagnosticsRange = isAutoFormatOn ? new Range(editor.selection.start, editor.selection.end) : typeRange;
+    editor.selection = initialSelection;
     for (let i = 0; i < 30; i++) {
       const diagnostics = languages.getDiagnostics(document.uri);
       if (diagnostics.find((x) => diagnosticsRange.contains(x.range) || x.range.contains(diagnosticsRange))) {
@@ -80,4 +97,17 @@ export const commandHandler = async (typescriptHoverResult: string, position: Po
       await sleep(100);
     }
   }
+};
+
+export const commandId = 'extension.generateExplicitType';
+export const commandHandler = async (generateTypeInfos: GenerateTypeInfo[], autoImport = false) => {
+  const editor = window.activeTextEditor;
+  if (!editor) {
+    return;
+  }
+
+  const config = workspace.getConfiguration(configurationId);
+  const isAutoFormatOn = config.get<boolean>(ConfigurationKey.formatAfterGeneration);
+
+  await generateType(generateTypeInfos[0], editor, autoImport, isAutoFormatOn);
 };
