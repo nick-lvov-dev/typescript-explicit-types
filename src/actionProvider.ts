@@ -1,4 +1,4 @@
-import { uniqWith } from 'lodash';
+import uniqWith from 'lodash.uniqwith';
 import {
   CodeAction,
   CodeActionContext,
