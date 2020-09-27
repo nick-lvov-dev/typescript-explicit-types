@@ -45,6 +45,10 @@ function executeSymbolProvider(uri: Uri) {
   return commands.executeCommand<DocumentSymbol[]>('vscode.executeDocumentSymbolProvider', uri);
 }
 
+// some definitions are followed by brackets, but the type hover shows them as properties
+// since type extraction depends on whether the definition is a function or not, there are some exceptions
+const functionHandlerExceptions = ['get'];
+
 export class GenereateTypeProvider implements CodeActionProvider {
   public static readonly fixAllCodeActionKind = CodeActionKind.SourceFixAll.append('tslint');
 
@@ -120,31 +124,31 @@ export class GenereateTypeProvider implements CodeActionProvider {
       }
 
       const symbol = symbols?.find((x) => x.selectionRange.contains(definition.originSelectionRange));
-      if (symbol?.kind === SymbolKind.Function || word === 'function') {
+      const trailingSlice = document.getText(new Range(definition.originSelectionRange.end, definition.targetRange.end));
+      const isFollowedByBracket = !!trailingSlice.match(/^(\s|\\[rn])*\(/);
+      if (symbol?.kind === SymbolKind.Function || word === 'function' || isFollowedByBracket) {
         // find out suitable type position by looking for a closing bracket of the function
         const offset = document.offsetAt(definition.originSelectionRange.end);
-        const relevantText = document.getText(new Range(definition.originSelectionRange.end, definition.targetRange.end));
-        const firstBracket = relevantText.indexOf('(');
-        const closingBracketIndex = findClosingBracketMatchIndex(relevantText, firstBracket);
+        const firstBracket = trailingSlice.indexOf('(');
+        const closingBracketIndex = findClosingBracketMatchIndex(trailingSlice, firstBracket);
 
-        const isFunctionTyped = relevantText.slice(closingBracketIndex + 1).match(/^\s*:/);
+        const isFunctionTyped = trailingSlice.slice(closingBracketIndex + 1).match(/^\s*:/);
         if (isFunctionTyped) continue;
+
+        const definitionSlice = document.getText(definition.targetRange);
+        const firstSymbol = definitionSlice.match(/^\w+/);
 
         generateTypeInfos.push({
           typescriptHoverResult: tsHoverContent,
           typePosition: document.positionAt(offset + closingBracketIndex + 1),
-          isFunction: true,
+          isFunction: !firstSymbol || !functionHandlerExceptions.includes(firstSymbol[0]),
         });
       } else {
         // check if type annotation is already present
-        let typePosition = new Position(definition.originSelectionRange.end.line, definition.originSelectionRange.end.character);
+        const typePosition = new Position(definition.originSelectionRange.end.line, definition.originSelectionRange.end.character);
         const slice = lineText.slice(typePosition.character);
         const match = slice.match(/^\s*:/g);
         if (match?.length) continue;
-
-        // if the definition is followed by brackets it's probably a getter, move type annotation position in that case
-        const matches = findMatches(/^\s*\(\)/g, slice);
-        if (matches.length) typePosition = new Position(typePosition.line, typePosition.character + matches[0][0].length);
 
         generateTypeInfos.push({
           typescriptHoverResult: tsHoverContent,

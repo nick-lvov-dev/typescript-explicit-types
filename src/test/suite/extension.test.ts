@@ -106,6 +106,26 @@ suite('Extension Test Suite', async function () {
     }
   });
 
+  test('Function property', async () => {
+    try {
+      const name = 'p3';
+      const textEditor = await window.showTextDocument(getUri(name));
+      await performTypeGeneration(name, textEditor.document);
+    } catch (e) {
+      assert.fail(e);
+    }
+  });
+
+  test('Complex getter property', async () => {
+    try {
+      const name = 'p4';
+      const textEditor = await window.showTextDocument(getUri(name));
+      await performTypeGeneration(name, textEditor.document);
+    } catch (e) {
+      assert.fail(e);
+    }
+  });
+
   test('Arrow function', async () => {
     try {
       const name = 'a1';
@@ -135,7 +155,7 @@ suite('Extension Test Suite', async function () {
       assert.fail(e);
     }
   });
-  
+
   test('Arrow function argument', async () => {
     try {
       const name = 'a4';
