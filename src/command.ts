@@ -26,8 +26,8 @@ function executeCodeActionProvider(uri: Uri, range: Range) {
   return commands.executeCommand<CodeAction[]>('vscode.executeCodeActionProvider', uri, range);
 }
 
-function executeFormatRangeProvider(uri: Uri, range: Range) {
-  return commands.executeCommand<TextEdit[]>('vscode.executeFormatRangeProvider', uri, range);
+function executeFormatDocumentProvider(uri: Uri) {
+  return commands.executeCommand<TextEdit[]>('vscode.executeFormatDocumentProvider', uri);
 }
 
 const executeActionCommand = async (action: CodeAction) => {
@@ -64,7 +64,7 @@ const generateType = async (
     if (autoImport) {
       editor.selection = new Selection(typeRange.start, typeRange.end);
     }
-    const edits = await executeFormatRangeProvider(document.uri, typeRange);
+    const edits = await executeFormatDocumentProvider(document.uri);
     if (!edits) return;
     const workspaceEdit = new WorkspaceEdit();
     workspaceEdit.set(document.uri, edits);
