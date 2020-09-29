@@ -2,7 +2,7 @@
   "name": "typescript-explicit-types",
   "displayName": "TypeScript Explicit Types",
   "description": "Generate explicit type annotation from inferred type in TypeScript",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "icon": "logo.png",
   "publisher": "nick-lvov-dev",
   "repository": "https://github.com/nick-lvov-dev/typescript-explicit-types",
@@ -31,11 +31,6 @@
           "type": "boolean",
           "default": true,
           "description": "Mark type generation actions as preferable."
-        },
-        "typescriptExplicitTypes.enableImportAction": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show action that automatically import the generated type if it's missing."
         },
         "typescriptExplicitTypes.formatAfterGeneration": {
           "type": "boolean",

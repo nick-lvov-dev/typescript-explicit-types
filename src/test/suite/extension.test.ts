@@ -29,10 +29,9 @@ function executeCodeActionProvider(uri: Uri, range: Range) {
 
 interface TypeGenerationOptions {
   expectedType?: string;
-  autoImport?: boolean;
 }
 
-const performTypeGeneration = async (element: string, document: TextDocument, { expectedType, autoImport }: TypeGenerationOptions = {}) => {
+const performTypeGeneration = async (element: string, document: TextDocument, { expectedType }: TypeGenerationOptions = {}) => {
   let fileText = document.getText();
   const f1Position = fileText.indexOf(element);
   const wordRange = document.getWordRangeAtPosition(document.positionAt(f1Position));
@@ -40,10 +39,7 @@ const performTypeGeneration = async (element: string, document: TextDocument, { 
     assert.fail(`${element} not found in file`);
   }
   const actions = await executeCodeActionProvider(document.uri, wordRange);
-  const generateAction = actions?.find((action) => {
-    const args = action.command?.arguments;
-    return Array.isArray(args) && args.length === (autoImport ? 2 : 1) && action.command!.command === commandId;
-  });
+  const generateAction = actions?.find((action) => action.command!.command === commandId);
   if (!generateAction) assert.fail('Generate action not found');
 
   const command = generateAction.command!;
@@ -53,7 +49,6 @@ const performTypeGeneration = async (element: string, document: TextDocument, { 
     const res = fileText.includes(`${element}: ${expectedType}`);
     assert.strictEqual(res, true);
   } else {
-    if (autoImport) await sleep(2000);
     const diagnostics = languages
       .getDiagnostics(document.uri)
       .filter((x) => [DiagnosticSeverity.Error, DiagnosticSeverity.Warning].includes(x.severity));
@@ -176,44 +171,12 @@ suite('Extension Test Suite', async function () {
     }
   });
 
-  test('Simple import', async () => {
-    try {
-      const name = 'imp1';
-      const textEditor = await window.showTextDocument(getUri(name));
-      await performTypeGeneration(name, textEditor.document, { autoImport: true });
-    } catch (e) {
-      assert.fail(e);
-    }
-  });
-
-  test('Complex import', async () => {
-    try {
-      const name = 'imp2';
-      const textEditor = await window.showTextDocument(getUri(name));
-      await performTypeGeneration(name, textEditor.document, { autoImport: true });
-    } catch (e) {
-      assert.fail(e);
-    }
-  });
-
   test('Simple cursor', async () => {
     try {
       const name = 'cursor1';
       const textEditor = await window.showTextDocument(getUri(name));
       const initialCursorPosition = new Selection(textEditor.selection.anchor, textEditor.selection.active);
       await performTypeGeneration(name, textEditor.document);
-      assert.deepStrictEqual(initialCursorPosition, textEditor.selection);
-    } catch (e) {
-      assert.fail(e);
-    }
-  });
-
-  test('Import cursor', async () => {
-    try {
-      const name = 'cursor2';
-      const textEditor = await window.showTextDocument(getUri(name));
-      const initialCursorPosition = new Selection(textEditor.selection.anchor, textEditor.selection.active);
-      await performTypeGeneration(name, textEditor.document, { autoImport: true });
       assert.deepStrictEqual(initialCursorPosition, textEditor.selection);
     } catch (e) {
       assert.fail(e);

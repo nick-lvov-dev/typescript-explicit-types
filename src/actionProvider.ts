@@ -59,7 +59,6 @@ export class GenereateTypeProvider implements CodeActionProvider {
   public async provideCodeActions(document: TextDocument, range: Range | Selection, context: CodeActionContext): Promise<CodeAction[]> {
     const config = workspace.getConfiguration(configurationId);
     const isPreferrable = config.get<boolean>(ConfigurationKey.preferable);
-    const isAutoImportActionEnabled = config.get<boolean>(ConfigurationKey.enableImportAction);
 
     const allDefinitions: Location[] = [];
     for (let lineNumber = range.start.line; lineNumber <= range.end.line; lineNumber++) {
@@ -164,15 +163,6 @@ export class GenereateTypeProvider implements CodeActionProvider {
     action.command = { command: 'extension.generateExplicitType', title: 'Generate explicit type', arguments: args };
     action.isPreferred = isPreferrable;
 
-    if (generateTypeInfos.length > 1 || !isAutoImportActionEnabled) return [action];
-
-    const actionWithAutoImport = new CodeAction('Generate explicit type & import', CodeActionKind.QuickFix);
-    actionWithAutoImport.command = {
-      command: 'extension.generateExplicitType',
-      title: 'Generate explicit type & import',
-      arguments: [...args, true],
-    };
-    actionWithAutoImport.isPreferred = isPreferrable;
-    return [actionWithAutoImport, action];
+    return [action];
   }
 }
