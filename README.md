@@ -5,7 +5,7 @@
 [![Installs](https://vsmarketplacebadge.apphb.com/installs/nick-lvov-dev.typescript-explicit-types.svg
 )](https://marketplace.visualstudio.com/items?itemName=nick-lvov-dev.typescript-explicit-types)
 
-VS Code extensions that lets you generate explicit typescript types for you properties and variables
+VS Code extension that lets you generate explicit typescript types for variables, functions and class properties.
 
 ## Demo
 
@@ -13,4 +13,4 @@ VS Code extensions that lets you generate explicit typescript types for you prop
 
 ## Prequisites
 
-This extension requires VS Code TypeScript support to be turned on
+This extension requires VS Code TypeScript support to be turned on.
