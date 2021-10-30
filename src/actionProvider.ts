@@ -16,7 +16,7 @@ import {
   Uri,
   workspace,
 } from 'vscode';
-import { commandHandler, GenerateTypeInfo } from './command';
+import { CommandHandler, GenerateTypeInfo } from './command';
 import { configurationId, ConfigurationKey } from './configuraiton';
 import { findClosingBracketMatchIndex } from './helpers/findClosingBracketMatchIndex';
 import { findMatches } from './helpers/findMatches';
@@ -159,7 +159,7 @@ export class GenereateTypeProvider implements CodeActionProvider {
     if (!generateTypeInfos.length) return [];
 
     const action = new CodeAction('Generate explicit type', CodeActionKind.QuickFix);
-    const args: Parameters<typeof commandHandler> = [generateTypeInfos];
+    const args: Parameters<CommandHandler> = [generateTypeInfos];
     action.command = { command: 'extension.generateExplicitType', title: 'Generate explicit type', arguments: args };
     action.isPreferred = isPreferrable;
 
