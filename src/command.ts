@@ -43,11 +43,14 @@ const generateType = async (
 };
 
 export const commandId = 'extension.generateExplicitType';
+
 export const commandHandler = async (generateTypeInfos: GenerateTypeInfo[], autoImport = false) => {
   const editor = window.activeTextEditor;
   if (!editor) {
     return;
   }
 
-  await generateType(generateTypeInfos[0], editor, autoImport);
+  await generateType(generateTypeInfos?.[0], editor, autoImport);
 };
+
+export type CommandHandler = typeof commandHandler;
